@@ -12,8 +12,9 @@ import {
 
 interface FileItem {
   file: File;
-  status: "idle" | "uploading" | "processing" | "completed" | "error";
+  status: "idle" | "uploading" | "completed" | "error";
   progress?: number;
+  response?: string;
   error?: string;
 }
 
@@ -21,6 +22,9 @@ export default function UploadPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:3001";
+
+  // 🧩 Select Files
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files).map((file) => ({
@@ -32,6 +36,7 @@ export default function UploadPage() {
     }
   };
 
+  // 🧩 Drag & Drop
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const droppedFiles = Array.from(e.dataTransfer.files).map((file) => ({
@@ -42,52 +47,66 @@ export default function UploadPage() {
     setFiles((prev) => [...prev, ...droppedFiles]);
   };
 
-  const handleClearAll = () => {
-    setFiles([]);
-  };
+  // 🧹 Clear all files
+  const handleClearAll = () => setFiles([]);
 
-  const simulateUpload = async () => {
+  // 🚀 Upload Files (Real API)
+  const handleUpload = async () => {
+    if (files.length === 0) return;
     setUploading(true);
     const updated = [...files];
 
     for (let i = 0; i < updated.length; i++) {
-      const file = updated[i];
-      if (!["pdf", "txt", "docx"].some((ext) => file.file.name.endsWith(ext))) {
-        updated[i] = { ...file, status: "error", error: "Unsupported file type" };
-        continue;
-      }
-
+      const fileItem = updated[i];
       updated[i].status = "uploading";
       setFiles([...updated]);
 
-      // Simulate upload progress
-      for (let p = 0; p <= 100; p += 10) {
-        updated[i].progress = p;
-        setFiles([...updated]);
-        await new Promise((r) => setTimeout(r, 100));
-      }
+      try {
+        const formData = new FormData();
+        formData.append("files", fileItem.file);
 
-      updated[i].status = "completed";
-      updated[i].progress = 100;
-      setFiles([...updated]);
+        // ✅ Send to backend
+        const res = await fetch(`${BASE_URL}/api/qa/upload`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+          },
+          body: formData,
+        });
+
+        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+
+        const data = await res.json();
+        console.log("Upload Response:", data);
+
+        updated[i].status = "completed";
+        updated[i].progress = 100;
+        updated[i].response = data.message || "Uploaded successfully ✅";
+        setFiles([...updated]);
+      } catch (err: any) {
+        console.error("Upload Error:", err);
+        updated[i].status = "error";
+        updated[i].error = err.message || "Upload failed.";
+        setFiles([...updated]);
+      }
     }
 
     setUploading(false);
   };
 
-  const removeFile = (index: number) => {
+  // 🗑️ Remove a file from list
+  const removeFile = (index: number) =>
     setFiles((prev) => prev.filter((_, i) => i !== index));
-  };
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-50 text-gray-900 font-sans px-6 py-10">
       <div className="w-full max-w-5xl">
         {/* Header */}
-        <h1 className="text-3xl font-bold mb-6 text-gray-900">
-          Upload Documents
+        <h1 className="text-3xl font-bold mb-6 text-gray-900 flex items-center gap-2">
+          <UploadCloud className="text-blue-600" /> Upload Documents
         </h1>
 
-        {/* Upload Box */}
+        {/* Upload Drop Zone */}
         <div
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
@@ -98,7 +117,7 @@ export default function UploadPage() {
             Drag & Drop Files or Folders Here
           </p>
           <p className="text-gray-500 text-sm mb-4">
-            Supports PDF, DOCX, TXT, and more.
+            Supports PDF, DOCX, and TXT formats.
           </p>
           <input
             type="file"
@@ -128,11 +147,18 @@ export default function UploadPage() {
                 Clear All
               </button>
               <button
-                onClick={simulateUpload}
+                onClick={handleUpload}
                 disabled={uploading}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium text-sm shadow-sm disabled:opacity-50"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium text-sm shadow-sm disabled:opacity-50 flex items-center gap-2"
               >
-                {uploading ? "Processing..." : "Start Processing"}
+                {uploading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Uploading...
+                  </>
+                ) : (
+                  "Start Upload"
+                )}
               </button>
             </div>
           </div>
@@ -149,13 +175,12 @@ export default function UploadPage() {
                   : "bg-white border-gray-200 hover:border-blue-200"
               } transition`}
             >
+              {/* File Info */}
               <div className="flex items-center gap-3">
                 <FileText
                   size={22}
                   className={`${
-                    item.status === "error"
-                      ? "text-red-500"
-                      : "text-blue-500"
+                    item.status === "error" ? "text-red-500" : "text-blue-500"
                   }`}
                 />
                 <div>
@@ -168,6 +193,7 @@ export default function UploadPage() {
                 </div>
               </div>
 
+              {/* Status */}
               <div className="flex items-center gap-4">
                 {item.status === "uploading" && (
                   <div className="flex flex-col items-end">
@@ -176,7 +202,7 @@ export default function UploadPage() {
                     </p>
                     <div className="w-24 bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-blue-600 h-2 rounded-full"
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${item.progress}%` }}
                       ></div>
                     </div>
@@ -184,14 +210,28 @@ export default function UploadPage() {
                 )}
 
                 {item.status === "completed" && (
-                  <div className="flex items-center text-green-600 gap-1 text-sm font-medium">
-                    <CheckCircle size={16} /> Completed
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center text-green-600 gap-1 text-sm font-medium">
+                      <CheckCircle size={16} /> Completed
+                    </div>
+                    {item.response && (
+                      <p className="text-xs text-gray-500 mt-1 max-w-[200px] text-right">
+                        {item.response}
+                      </p>
+                    )}
                   </div>
                 )}
 
                 {item.status === "error" && (
-                  <div className="flex items-center text-red-600 gap-1 text-sm font-medium">
-                    <XCircle size={16} /> Error
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center text-red-600 gap-1 text-sm font-medium">
+                      <XCircle size={16} /> Error
+                    </div>
+                    {item.error && (
+                      <p className="text-xs text-gray-500 mt-1 max-w-[200px] text-right">
+                        {item.error}
+                      </p>
+                    )}
                   </div>
                 )}
 

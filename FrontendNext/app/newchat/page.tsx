@@ -40,7 +40,8 @@ export default function InsightStreamFullUI() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const BASE_URL = "http://localhost:3001";
+  const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+
 
   function getAuthHeaders(): Record<string, string> {
     const token =
