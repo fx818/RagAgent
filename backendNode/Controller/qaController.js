@@ -4,7 +4,7 @@ import { marked } from "marked";
 import { PrismaClient } from "../generated/prisma/index.js";
 
 const prisma = new PrismaClient();
-const FASTAPI_URL = "http://127.0.0.1:8000";
+const FASTAPI_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
 
 // --- Helper: Get or create latest conversation ---
 const getOrCreateConversation = async (userId) => {
