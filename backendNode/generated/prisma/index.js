@@ -146,7 +146,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\Users\\anura\\Desktop\\Gemini File Search\\application\\backend\\generated\\prisma",
+      "value": "C:\\Users\\anura\\Documents\\GitHub\\RagAgent\\backendNode\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -160,7 +160,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\Users\\anura\\Desktop\\Gemini File Search\\application\\backend\\prisma\\schema.prisma",
+    "sourceFilePath": "C:\\Users\\anura\\Documents\\GitHub\\RagAgent\\backendNode\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -174,16 +174,17 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
         "fromEnvVar": null,
-        "value": "postgresql://postgres:fx818@localhost:5432/geminiSearch?schema=public"
+        "value": "postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:5432/postgres?pgbouncer=true&sslmode=require"
       }
     }
   },
-  "inlineSchema": "// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = \"prisma-client-js\"\n  output   = \"../generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = \"postgresql://postgres:fx818@localhost:5432/geminiSearch?schema=public\"\n}\n\nmodel User {\n  id            Int            @id @default(autoincrement())\n  username      String         @unique // ADDED @unique\n  email         String         @unique\n  password      String\n  createdAt     DateTime       @default(now())\n  updatedAt     DateTime       @updatedAt\n  conversations Conversation[] // Relation to Conversation\n}\n\nmodel Conversation {\n  id        Int       @id @default(autoincrement())\n  userId    Int\n  user      User      @relation(fields: [userId], references: [id])\n  isPublic  Boolean   @default(false) // ADDED this line\n  createdAt DateTime  @default(now())\n  updatedAt DateTime  @updatedAt\n  messages  Message[] // Relation to Messages\n}\n\nmodel Message {\n  id             Int          @id @default(autoincrement())\n  conversationId Int\n  conversation   Conversation @relation(fields: [conversationId], references: [id])\n  role           String // \"user\" or \"model\"\n  content        String\n  createdAt      DateTime     @default(now())\n}\n",
-  "inlineSchemaHash": "9581ee543f3ba83861fb57e813dd69403ab060ec00b3833ae56b91aa8749724b",
+  "inlineSchema": "// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = \"prisma-client-js\"\n  output   = \"../generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = \"postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:5432/postgres?pgbouncer=true&sslmode=require\"\n}\n\nmodel User {\n  id            Int            @id @default(autoincrement())\n  username      String         @unique // ADDED @unique\n  email         String         @unique\n  password      String\n  createdAt     DateTime       @default(now())\n  updatedAt     DateTime       @updatedAt\n  conversations Conversation[] // Relation to Conversation\n}\n\nmodel Conversation {\n  id        Int       @id @default(autoincrement())\n  userId    Int\n  user      User      @relation(fields: [userId], references: [id])\n  isPublic  Boolean   @default(false) // ADDED this line\n  createdAt DateTime  @default(now())\n  updatedAt DateTime  @updatedAt\n  messages  Message[] // Relation to Messages\n}\n\nmodel Message {\n  id             Int          @id @default(autoincrement())\n  conversationId Int\n  conversation   Conversation @relation(fields: [conversationId], references: [id])\n  role           String // \"user\" or \"model\"\n  content        String\n  createdAt      DateTime     @default(now())\n}\n",
+  "inlineSchemaHash": "6590c924dbef79b62e5a2b2dcab0f28dd93e3a3360995c4b37b8094dc847dc4e",
   "copyEngine": true
 }
 
