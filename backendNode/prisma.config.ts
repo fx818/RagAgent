@@ -7,6 +7,7 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: "postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:5432/postgres",
+    url: "postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:6543/postgres?pgbouncer=true&sslmode=require
+",
   },
 });
