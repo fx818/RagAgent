@@ -2,13 +2,13 @@
 import cors from "cors";
 
 const allowedOrigins = [
-  "http://localhost:3000",         // Local development
-  "https://ragagent-xi.vercel.app" // Deployed frontend
+  "http://localhost:3000",
+  "https://ragagent-xi.vercel.app",
+  "https://ragagent-bujm.onrender.com", // ✅ allow backend’s own origin for preflight
 ];
 
 const corsMiddleware = cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
