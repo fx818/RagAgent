@@ -1,18 +1,11 @@
 import axios from "axios";
 import FormData from "form-data";
 import { marked } from "marked";
-import https from "https";
 import { PrismaClient } from "../generated/prisma/index.js";
 
 const prisma = new PrismaClient();
 const FASTAPI_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
 
-
-const fastapiCert = process.env.FASTAPI_CA_CERT;
-
-const httpsAgent = new https.Agent({
-  ca: fastapiCert, // trust the EC2 FastAPI cert
-});
 
 // --- Helper: Get or create latest conversation ---
 const getOrCreateConversation = async (userId) => {
@@ -95,7 +88,6 @@ export const askQuestion = async (req, res) => {
         const encodedPrompt = new URLSearchParams({ prompt }).toString();
         const response = await axios.post(`${FASTAPI_URL}/ask`, encodedPrompt, {
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            httpsAgent,
         });
 
         const answer = response.data.answer || "No response from model.";
