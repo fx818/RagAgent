@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 const NEXT_PUBLIC_BACKEND_API_URL =
-  process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:3001";
+  process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://52.66.141.120:3001";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
