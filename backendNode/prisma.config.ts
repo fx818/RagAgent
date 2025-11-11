@@ -7,6 +7,6 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: "postgresql://postgres:fx818@localhost:5432/geminiSearch?schema=public",
+    url: "postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:5432/postgres",
   },
 });
