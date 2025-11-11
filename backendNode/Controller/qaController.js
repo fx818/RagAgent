@@ -95,7 +95,7 @@ export const askQuestion = async (req, res) => {
         const encodedPrompt = new URLSearchParams({ prompt }).toString();
         const response = await axios.post(`${FASTAPI_URL}/ask`, encodedPrompt, {
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            httpAgent,
+            httpsAgent,
         });
 
         const answer = response.data.answer || "No response from model.";
