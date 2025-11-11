@@ -14,6 +14,7 @@ import qaRoutes from "./routes/qaRoutes.js";
 import publicShareRoute from './routes/publicShareRouter.js';
 
 app.use(corsMiddleware);
+app.options("*", corsMiddleware); // handle preflight
 app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
