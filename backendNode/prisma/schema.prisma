@@ -11,7 +11,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:5432/postgres"
+  url      = "postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:6543/postgres?pgbouncer=true&sslmode=require"
+  ?pgbouncer=true
+
 }
 
 model User {
