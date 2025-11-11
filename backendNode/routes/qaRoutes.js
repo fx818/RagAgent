@@ -16,8 +16,8 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Secure routes
-router.post("/upload", upload.array("files"), uploadFiles);
-router.post("/ask", askQuestion);
+router.post("/upload", auth, upload.array("files"), uploadFiles);
+router.post("/ask", auth, askQuestion);
 router.get("/history", auth, getHistory);
 router.get("/history/:conversationId", auth, getConversationById);
 router.patch("/share/:conversationId", auth, toggleConversationPublic);
