@@ -6,7 +6,4 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   engine: "classic",
-  datasource: {
-    url: "postgresql://postgres:prossima@db.uxkovlvicqkhokmckyqv.supabase.co:6543/postgres?pgbouncer=true&sslmode=require",
-  },
 });
