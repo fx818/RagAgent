@@ -1,291 +1,475 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { Send, Loader2, UserCircle, Bot, FileDown } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import {
+  Bot,
+  UserCircle,
+  Send,
+  Trash2,
+  FilePlus,
+  Loader2,
+  UploadCloud,
+  Eye,
+  Share2,
+  Plus,
+  Copy,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 
-interface Message {
-  sender: "user" | "ai";
-  text: string;
-}
+type Message = { sender: "user" | "ai"; text: string; createdAt?: string };
+type ConversationSummary = {
+  id: string;
+  title?: string;
+  updatedAt?: string;
+  isPublic?: boolean;
+};
 
-// --- Helper to fix unsupported Tailwind LAB colors ---
-function sanitizeColors(element: HTMLElement) {
-  const stylesheets = Array.from(document.styleSheets);
-  stylesheets.forEach((sheet) => {
-    try {
-      const rules = (sheet as CSSStyleSheet).cssRules;
-      if (!rules) return;
-      for (let i = 0; i < rules.length; i++) {
-        const rule = rules[i] as CSSStyleRule;
-        if (rule.style && rule.style.color && rule.style.color.includes("lab")) {
-          rule.style.color = "rgb(0, 0, 0)";
-        }
-        if (rule.style && rule.style.backgroundColor && rule.style.backgroundColor.includes("lab")) {
-          rule.style.backgroundColor = "rgb(255, 255, 255)";
-        }
-      }
-    } catch {
-      // ignore cross-origin stylesheets
-    }
-  });
-
-  element.querySelectorAll("*").forEach((el) => {
-    const computed = window.getComputedStyle(el);
-    const bg = computed.backgroundColor;
-    const color = computed.color;
-    if (bg.includes("lab")) (el as HTMLElement).style.backgroundColor = "#ffffff";
-    if (color.includes("lab")) (el as HTMLElement).style.color = "#000000";
-  });
-}
-
-// --- PDF Export ---
-async function exportChatAsPDF() {
-  const chatContainer = document.getElementById("chat-container");
-  if (!chatContainer) {
-    alert("No chat found!");
-    return;
-  }
-
-  sanitizeColors(chatContainer);
-
-  const canvas = await html2canvas(chatContainer, {
-    scale: 2,
-    backgroundColor: "#ffffff",
-    useCORS: true,
-    logging: false,
-  });
-
-  const imgData = canvas.toDataURL("image/png");
-  const pdf = new jsPDF("p", "mm", "a4");
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgProps = pdf.getImageProperties(imgData);
-  const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
-
-  pdf.save("chat-export.pdf");
-}
-
-export default function ChatPage() {
+export default function InsightStreamFullUI() {
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [title, setTitle] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
+  const chatRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+
+
+  function getAuthHeaders(): Record<string, string> {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  // autoscroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  // initial load
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
-    const userMessage: Message = { sender: "user", text: input.trim() };
-    setMessages((prev) => [...prev, userMessage]);
+  // toast auto clear
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // fetch history
+  async function fetchHistory() {
+    try {
+      const res = await fetch(`${BASE_URL}/api/qa/history`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        console.error("history status", res.status);
+        throw new Error("Failed to load history");
+      }
+      const data = await res.json();
+      const list = data.history || data || [];
+      setConversations(list);
+      // if nothing selected and list exists, select first
+      if (list.length > 0 && !selectedId) {
+        selectConversation(list[0].id);
+      }
+    } catch (err) {
+      console.error("History Fetch Error:", err);
+      setConversations([]);
+    }
+  }
+
+  // select conversation
+  async function selectConversation(id: string) {
+    setSelectedId(id);
+    setShareLink(null);
+    try {
+      const res = await fetch(`${BASE_URL}/api/qa/history/${id}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        console.error("select convo status", res.status);
+        throw new Error("Failed to fetch conversation");
+      }
+      const data = await res.json();
+      const convo = data.conversation || data;
+
+      // set messages (backend returns role/content)
+      if (convo?.messages?.length) {
+        const formattedMsgs: Message[] = convo.messages.map((m: any) => ({
+          sender: m.role === "user" ? "user" : "ai",
+          text: m.content,
+          createdAt: m.createdAt,
+        }));
+        setMessages(formattedMsgs);
+        setTitle(convo.messages[0]?.content?.slice(0, 40) || "Conversation");
+      } else {
+        setMessages([]);
+        setTitle(convo?.title || "New Conversation");
+      }
+
+      // if convo has isPublic and a share url endpoint exists, build shareLink if available
+      if (convo?.isPublic && convo?.user?.username) {
+        const url = `${window.location.origin}/${convo.user.username}/${convo.id}`;
+        setShareLink(url);
+      }
+    } catch (err) {
+      console.error("Conversation Load Error:", err);
+      setMessages([{ sender: "ai", text: "⚠️ Unable to load conversation." }]);
+    }
+  }
+
+  // create new conversation
+  async function createNewChat() {
+    try {
+      const res = await fetch(`${BASE_URL}/api/qa/new`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        console.error("create new chat failed", res.status, t);
+        throw new Error("Failed to create conversation");
+      }
+      const data = await res.json();
+      const newId = data.conversationId || data.id || data.conversation?.id;
+      if (!newId) throw new Error("No conversationId returned");
+      setSelectedId(String(newId));
+      setMessages([]);
+      setTitle("New Conversation");
+      setToast("New chat created");
+      // refresh list
+      await fetchHistory();
+    } catch (err) {
+      console.error("New Chat Error:", err);
+      setToast("Failed to create new chat");
+    }
+  }
+
+  // send message
+  async function handleSendMessage() {
+    if (!input.trim() || loading) return;
+    const text = input.trim();
+    const userMsg: Message = {
+      sender: "user",
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/ask", {
+      const form = new URLSearchParams();
+      form.append("prompt", text);
+      if (selectedId) form.append("conversationId", selectedId);
+
+      const res = await fetch(`${BASE_URL}/api/qa/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ prompt: input.trim() }),
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          ...getAuthHeaders(),
+        },
+        body: form,
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      if (!res.ok) {
+        console.error("ask status", res.status);
+        // show server message if any
+        const txt = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status} ${txt}`);
+      }
 
-      const aiMessage: Message = {
+      const data = await res.json();
+
+      // if backend returned conversationId (new convo), adopt it
+      if (data.conversationId) {
+        setSelectedId(String(data.conversationId));
+      }
+
+      const aiMsg: Message = {
         sender: "ai",
         text: data.answer || "No response.",
+        createdAt: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, aiMessage]);
-    } catch (error) {
-      console.error("Error:", error);
+      setMessages((prev) => [...prev, aiMsg]);
+      await fetchHistory();
+    } catch (err) {
+      console.error("Ask Error:", err);
       setMessages((prev) => [
         ...prev,
         { sender: "ai", text: "⚠️ There was an error connecting to the server." },
       ]);
+      setToast("Failed to send message");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") sendMessage();
-  };
+  function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") handleSendMessage();
+  }
+
+  // file upload
+  async function handleFileUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    Array.from(files).forEach((f) => formData.append("files", f));
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/qa/upload`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: formData,
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        console.error("upload failed", res.status, txt);
+        throw new Error("Upload failed");
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text: `📁 Uploaded ${files.length} file(s). You can now ask questions about them.`,
+        },
+      ]);
+      await fetchHistory();
+      setToast("Files uploaded");
+    } catch (err) {
+      console.error("Upload Error:", err);
+      setToast("Upload failed");
+    }
+  }
+
+  // share chat: toggle and if public copy link
+  async function handleShareChat() {
+    if (!selectedId) {
+      setToast("Select a chat first");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/qa/share/${selectedId}`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        console.error("share status", res.status, txt);
+        throw new Error("Failed to toggle share");
+      }
+
+      const data = await res.json();
+      // backend should return { isPublic, shareUrl? }
+      if (data.isPublic) {
+        const shareUrl = data.shareUrl || data.shareUrl === "" ? data.shareUrl : `${window.location.origin}/${data.username || "user"}/${selectedId}`;
+        setShareLink(shareUrl);
+        // try copying to clipboard
+        try {
+          if (navigator.clipboard && shareUrl) {
+            await navigator.clipboard.writeText(shareUrl);
+            setToast("Public link copied to clipboard");
+          } else if (shareUrl) {
+            // fallback: create temporary input
+            const tmp = document.createElement("input");
+            tmp.value = shareUrl;
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand("copy");
+            document.body.removeChild(tmp);
+            setToast("Public link copied to clipboard");
+          } else {
+            setToast("Shared, but no URL returned");
+          }
+        } catch {
+          setToast("Shared — copy failed");
+        }
+        // add small ai message in chat
+        setMessages((prev) => [
+          ...prev,
+          { sender: "ai", text: `🔗 Chat is public: ${shareUrl || "(no URL returned)"}` },
+        ]);
+      } else {
+        // now private
+        setShareLink(null);
+        setMessages((prev) => [...prev, { sender: "ai", text: "🔒 Chat made private." }]);
+        setToast("Chat is now private");
+      }
+
+      // refresh history to update isPublic flag
+      await fetchHistory();
+    } catch (err) {
+      console.error("Share Chat Error:", err);
+      setToast("Failed to toggle share");
+    }
+  }
+
+  // delete conversation
+  async function handleDeleteConversation() {
+    if (!selectedId) {
+      setToast("Select a chat first");
+      return;
+    }
+    try {
+      const res = await fetch(`${BASE_URL}/api/qa/history/${selectedId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        console.error("delete status", res.status, txt);
+        throw new Error("Delete failed");
+      }
+      setConversations((prev) => prev.filter((c) => String(c.id) !== String(selectedId)));
+      setSelectedId(null);
+      setMessages([]);
+      setTitle(null);
+      setShareLink(null);
+      setToast("Conversation deleted");
+      await fetchHistory();
+    } catch (err) {
+      console.error("Delete Error:", err);
+      setToast("Failed to delete conversation");
+    }
+  }
+
+  const filtered = conversations.filter((c) =>
+    (c.title || "").toLowerCase().includes(query.toLowerCase())
+  );
 
   return (
-    <div className="flex flex-col w-full h-full bg-gray-50 text-gray-900 font-sans">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm sticky top-0 z-10">
-        <h1 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <Bot className="text-blue-600" /> Document Assistant
-        </h1>
-        <button
-          onClick={exportChatAsPDF}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition"
-        >
-          <FileDown size={16} />
-          Export PDF
-        </button>
-      </div>
-
-      {/* Chat Body */}
-      <div id="chat-container" className="flex-1 overflow-y-auto p-8 space-y-6">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-md px-10 py-12 max-w-3xl w-full">
-              <div className="flex justify-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Bot className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-              <h1 className="text-2xl font-semibold text-gray-800 mb-2">
-                Welcome to InsightStream
-              </h1>
-              <p className="text-gray-500 text-sm mb-6">
-                Start by asking a question about your uploaded documents. Try one of these:
-              </p>
-
-              <div className="grid sm:grid-cols-2 gap-3 mt-4">
-                {[
-                  "Summarize the key findings from the calibration report",
-                  "What are the total expenses in Lot 2?",
-                  "Summarize the invoice for client A.",
-                  "List all unique project names mentioned in documents.",
-                ].map((example, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setInput(example)}
-                    className="border border-gray-200 rounded-lg py-2 px-4 text-sm text-gray-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition"
-                  >
-                    {example}
-                  </button>
-                ))}
-              </div>
+    <div className="flex h-[80vh] w-[85vw] mx-auto mt-8 rounded-2xl overflow-hidden shadow-2xl bg-white/70 backdrop-blur-md border border-gray-200">
+      {/* Sidebar */}
+      <aside className="w-80 bg-gradient-to-b from-blue-50 to-white border-r border-gray-200 flex flex-col">
+        <div className="px-5 py-5 border-b border-gray-200 bg-white/70 backdrop-blur-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bot className="text-blue-600" />
+              <h2 className="font-semibold text-lg text-gray-800">InsightStream</h2>
             </div>
+            <button onClick={createNewChat} className="p-2 rounded-full hover:bg-blue-100 transition" title="New Chat">
+              <Plus className="text-blue-600" size={18} />
+            </button>
           </div>
-        ) : (
-          <>
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`flex items-start gap-3 ${msg.sender === "user" ? "justify-end" : "justify-start"
-                  }`}
-              >
-                {msg.sender === "ai" && (
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Bot className="text-blue-600 w-4 h-4" />
-                    </div>
-                  </div>
-                )}
 
-                <div
-                  className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.sender === "user"
-                      ? "bg-blue-600 text-white rounded-br-none"
-                      : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"
-                    }`}
+          <div className="mt-3 flex gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-full text-sm focus:ring-1 focus:ring-blue-400 outline-none"
+            />
+            <button onClick={() => fileInputRef.current?.click()} className="p-2 border rounded-full hover:bg-blue-50 transition">
+              <UploadCloud size={18} className="text-blue-600" />
+            </button>
+            <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files)} />
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-2">
+          {filtered.length === 0 ? (
+            <div className="text-sm text-gray-500 text-center mt-10">No chats yet. Start a new one!</div>
+          ) : (
+            <ul>
+              {filtered.map((c) => (
+                <li
+                  key={c.id}
+                  className={`px-4 py-3 cursor-pointer rounded-lg mb-2 ${selectedId === String(c.id) ? "bg-blue-100 border border-blue-300" : "hover:bg-gray-50"} transition`}
+                  onClick={() => selectConversation(String(c.id))}
                 >
-                  {msg.sender === "ai" ? (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        h1: ({ children }) => (
-                          <h1 className="text-lg font-bold text-blue-600 mb-2">{children}</h1>
-                        ),
-                        h2: ({ children }) => (
-                          <h2 className="text-base font-semibold text-blue-500 mb-1">{children}</h2>
-                        ),
-                        p: ({ children }) => <p className="mb-2">{children}</p>,
-                        ul: ({ children }) => <ul className="list-disc ml-5 mb-2">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal ml-5 mb-2">{children}</ol>,
-                        li: ({ children }) => <li className="mb-1">{children}</li>,
-                        strong: ({ children }) => (
-                          <strong className="text-blue-600 font-semibold">{children}</strong>
-                        ),
-                        code: ({ children }) => (
-                          <code className="bg-blue-50 px-1 py-0.5 rounded text-sm text-blue-700 border border-blue-100">
-                            {children}
-                          </code>
-                        ),
-                      }}
-                    >
-                      {msg.text}
-                    </ReactMarkdown>
-                  ) : (
-                    msg.text
-                  )}
-                </div>
-
-                {msg.sender === "user" && (
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                      <UserCircle className="text-gray-700 w-5 h-5" />
+                  <div className="flex justify-between items-center">
+                    <div className="truncate">
+                      <div className="font-medium text-gray-800 text-sm">
+                        {c.title || "Untitled Chat"}
+                      </div>
+                      <div className="text-xs text-gray-500">{c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ""}</div>
                     </div>
+                    {c.isPublic && <Eye size={14} className="text-blue-500" />}
                   </div>
-                )}
-              </div>
-            ))}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </aside>
 
-            {loading && (
-              <div className="flex items-center gap-3">
+      {/* Chat Window */}
+      <main className="flex-1 flex flex-col bg-gradient-to-br from-white to-blue-50">
+        <div ref={chatRef} className="flex-1 overflow-auto p-8 space-y-4 max-w-3xl mx-auto w-full">
+          {messages.map((m, i) => (
+            <div key={i} className={`flex gap-3 ${m.sender === "user" ? "justify-end" : "justify-start"}`}>
+              {m.sender === "ai" && (
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                   <Bot className="text-blue-600 w-4 h-4" />
                 </div>
-                <div className="bg-white border border-gray-200 px-4 py-2 rounded-2xl text-sm text-gray-500 shadow-sm">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
-                  </div>
-                </div>
+              )}
+              <div className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm shadow ${m.sender === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-white border border-gray-200 rounded-bl-none text-gray-800"}`}>
+                {m.sender === "ai" ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown> : <pre className="whitespace-pre-wrap">{m.text}</pre>}
               </div>
-            )}
-          </>
+              {m.sender === "user" && (
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                  <UserCircle className="text-gray-700 w-4 h-4" />
+                </div>
+              )}
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="border-t bg-white p-4 flex items-center gap-3 shadow-inner">
+          <input type="text" placeholder="Ask a question..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKey} className="flex-1 px-4 py-2 border rounded-full text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
+          <button onClick={handleSendMessage} disabled={loading} className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition">
+            {loading ? <Loader2 className="animate-spin" /> : <Send />}
+          </button>
+        </div>
+      </main>
+
+      {/* Right Panel */}
+      <aside className="w-80 border-l bg-white p-5 flex flex-col gap-5 shadow-inner">
+        <div>
+          <h3 className="font-semibold text-gray-800 text-sm">Conversation Details</h3>
+          <p className="text-xs text-gray-500">Share or delete this chat instance.</p>
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-800">{title || "Untitled"}</div>
+          <div className="text-xs text-gray-500">ID: {selectedId || "-"}</div>
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={handleShareChat} className="flex-1 px-3 py-2 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm flex items-center gap-2">
+            <Share2 size={14} /> Share Chat
+          </button>
+          <button onClick={() => { if (shareLink) { navigator.clipboard?.writeText(shareLink).then(()=>setToast("Copied link"), ()=>setToast("Copy failed")) } }} title="Copy link" className="px-2 py-2 rounded-md border border-gray-200 bg-white">
+            <Copy size={16} />
+          </button>
+        </div>
+
+        {shareLink && (
+          <div className="text-xs text-gray-600 break-all border p-2 rounded bg-gray-50">
+            Public Link: <a className="text-blue-700 underline" href={shareLink} target="_blank" rel="noreferrer">{shareLink}</a>
+          </div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
 
-      {/* Input Bar */}
-      <div className="border-t border-gray-200 bg-white px-6 py-4 flex items-center gap-3 sticky bottom-0">
-        <input
-          type="text"
-          autoComplete="off"
-          name="chatInput"
-          id="chatInput"
-          placeholder="Ask a follow-up question..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyPress}
-          suppressHydrationWarning
-          className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-full text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-
-        <button
-          onClick={sendMessage}
-          disabled={loading}
-          className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center shadow-sm"
-        >
-          {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+        <button onClick={handleDeleteConversation} className="px-3 py-2 rounded-md bg-red-50 hover:bg-red-100 text-red-600 text-sm flex items-center gap-2">
+          <Trash2 size={14} /> Delete
         </button>
-      </div>
+
+        {toast && <div className="mt-2 px-3 py-2 bg-black text-white text-xs rounded">{toast}</div>}
+      </aside>
     </div>
   );
 }

@@ -5,7 +5,9 @@ import { PrismaClient } from "../generated/prisma/index.js";
 
 const prisma = new PrismaClient();
 const FASTAPI_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+// const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
+const backendURLNode = process.env.BACKEND_URL_NODE || "http://localhost:3001";
 
 // --- Helper: Get or create latest conversation ---
 const getOrCreateConversation = async (userId) => {
@@ -221,7 +223,7 @@ export const toggleConversationPublic = async (req, res) => {
         });
 
         const publicUrl = updated.isPublic
-            ? `http://localhost:3001/api/qa/${conversation.user.username}/${updated.id}`
+            ? `${backendURLNode}/api/qa/${conversation.user.username}/${updated.id}`
             : null;
 
         return res.status(200).json({
@@ -230,7 +232,7 @@ export const toggleConversationPublic = async (req, res) => {
                 }.`,
             isPublic: updated.isPublic,
             shareUrl: updated.isPublic
-                ? `http://localhost:3001/${req.user.username}/${updated.id}`
+                ? `${backendURLNode}/${req.user.username}/${updated.id}`
                 : null,
         });
 
