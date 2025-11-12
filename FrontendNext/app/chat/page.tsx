@@ -359,8 +359,9 @@ export default function InsightStreamFullUI() {
               <Bot className="text-blue-600" />
               <h2 className="font-semibold text-lg text-gray-800">InsightStream</h2>
             </div>
-            <button onClick={createNewChat} className="p-2 rounded-full hover:bg-blue-100 transition" title="New Chat">
-              <Plus className="text-blue-600" size={18} />
+            <button onClick={createNewChat} className="p-2 rounded-full hover:bg-blue-400 bg-blue-100 transition size-small" title="New Chat">
+              {/* <Plus className="text-blue-600" size={18} /> */}
+              <p className="text-[.9vw]">New Chat</p>
             </button>
           </div>
 
@@ -371,9 +372,9 @@ export default function InsightStreamFullUI() {
               placeholder="Search..."
               className="flex-1 px-3 py-2 border border-gray-300 rounded-full text-sm focus:ring-1 focus:ring-blue-400 outline-none"
             />
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 border rounded-full hover:bg-blue-50 transition">
+            {/* <button onClick={() => fileInputRef.current?.click()} className="p-2 border rounded-full hover:bg-blue-50 transition">
               <UploadCloud size={18} className="text-blue-600" />
-            </button>
+            </button> */}
             <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files)} />
           </div>
         </div>

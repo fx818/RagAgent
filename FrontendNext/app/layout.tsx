@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gemini based File Search",
-  description: "Created by Anurag Upadhyay",
+  title: "RAG Agent",
+  description: "",
 };
 
 export default function RootLayout({
@@ -35,7 +35,7 @@ export default function RootLayout({
           {/* Navbar */}
           <nav className="bg-white w-full px-6 h-16 flex justify-between items-center border-b border-gray-200 sticky top-0 z-10 shadow-sm">
             <a href="/" className="text-xl font-semibold text-gray-900">
-              Gemini based File Search
+              RAG Agent
             </a>
             <ul className="flex items-center gap-6">
               <li>
